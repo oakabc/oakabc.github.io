@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>โปสเตอร์ QR จองคอมพิวเตอร์</title>
+<script src="qrcode.min.js"></script>
+<style>
+  body{font-family:-apple-system,'Segoe UI','Noto Sans Thai',sans-serif;margin:0;background:#f4f6fa}
+  .toolbar{padding:10px 16px;font-size:13px;color:#555;background:#fff;border-bottom:1px solid #e5e7eb}
+  .poster{max-width:640px;margin:24px auto;background:#fff;border-radius:16px;
+    padding:40px 32px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  h1{font-size:30px;margin:0 0 4px}
+  .sub{font-size:17px;color:#2563eb;font-weight:700;margin-bottom:24px}
+  canvas{width:min(320px,80%) !important;height:auto !important;border:8px solid #fff;outline:2px solid #e5e7eb;border-radius:8px}
+  .url{font-size:14px;color:#555;margin-top:10px;word-break:break-all}
+  .steps{text-align:left;display:inline-block;margin-top:24px;font-size:16px;line-height:2}
+  .steps b{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;
+    background:#2563eb;color:#fff;border-radius:50%;margin-right:8px;font-size:14px}
+  .rule{margin-top:20px;font-size:13.5px;color:#777;border-top:1px dashed #ddd;padding-top:14px}
+  @media print{
+    body{background:#fff}
+    .toolbar{display:none}
+    .poster{box-shadow:none;margin:0 auto;max-width:none}
+  }
+</style>
+</head>
+<body>
+<div class="toolbar">โปสเตอร์สำหรับพิมพ์ติดหน้าห้อง / บอร์ดประชาสัมพันธ์ — กด Ctrl/Cmd+P เพื่อพิมพ์</div>
+
+<div class="poster">
+  <h1>💻 จองคอมพิวเตอร์ห้อง Lab</h1>
+  <div class="sub">เปิดจองทุกวันศุกร์ เวลา 13:00–17:00 น.</div>
+  <canvas id="qr"></canvas>
+  <div class="url" id="url"></div>
+  <div class="steps">
+    <div><b>1</b>สแกน QR code ด้วยมือถือ</div>
+    <div><b>2</b>ดูผังที่นั่ง เลือกเครื่องที่ว่าง (สีเขียว)</div>
+    <div><b>3</b>เลือกช่วงเวลา กรอกชื่อ แล้วกดยืนยัน</div>
+  </div>
+  <div class="rule">จองขั้นต่ำ 30 นาที ต่อเนื่องได้จนถึง 17:00 น. · จองล่วงหน้าได้ 4 สัปดาห์<br>
+  ระบบจะแสดงรหัส 6 หลักหลังจองสำเร็จ — เก็บไว้สำหรับยกเลิกการจอง</div>
+</div>
+
+<script>
+// QR ชี้ไปหน้าผังที่นั่ง (index.html) — ฝังโดเมนจริงที่โฮสต์หน้านี้อัตโนมัติ
+const base = location.href.replace(/qr\.html.*$/, '');
+document.getElementById('url').textContent = base;
+QRCode.toCanvas(document.getElementById('qr'), base, { width: 640, margin: 1 });
+</script>
+</body>
+</html>

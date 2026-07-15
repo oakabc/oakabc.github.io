@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>จองคอมพิวเตอร์ห้อง Lab</title>
+<style>
+  :root{
+    --bg:#f4f6fa; --card:#fff; --ink:#1b2430; --muted:#67728a;
+    --brand:#2563eb; --brand-ink:#fff;
+    --free:#16a34a; --part:#f59e0b; --full:#dc2626; --off:#cbd5e1;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans Thai',sans-serif;
+    -webkit-tap-highlight-color:transparent}
+  header{background:var(--brand);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:5}
+  header h1{margin:0;font-size:17px;font-weight:700}
+  header .sub{font-size:12px;opacity:.85;margin-top:2px}
+  main{max-width:560px;margin:0 auto;padding:12px 12px 90px}
+  .card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:12px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .card h2{margin:0 0 10px;font-size:14px;color:var(--muted);font-weight:600}
+
+  /* เลือกวันศุกร์ */
+  .dates{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+  .date-btn{flex:0 0 auto;border:1.5px solid #dbe2ef;background:#fff;border-radius:10px;
+    padding:8px 12px;font-size:13px;text-align:center;cursor:pointer}
+  .date-btn.active{border-color:var(--brand);background:var(--brand);color:#fff}
+  .date-btn small{display:block;font-size:11px;opacity:.8}
+
+  /* ผังที่นั่ง */
+  .screen{background:#e2e8f0;color:#475569;text-align:center;border-radius:8px;
+    padding:5px;font-size:12px;margin-bottom:10px}
+  .map{display:flex;flex-direction:column;gap:7px}
+  .row{display:grid;grid-template-columns:repeat(3,1fr) 18px repeat(4,1fr);gap:6px}
+  .seat{aspect-ratio:1;border:none;border-radius:9px;font-size:13px;font-weight:700;color:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .seat.free{background:var(--free)}
+  .seat.part{background:var(--part)}
+  .seat.full{background:var(--full)}
+  .seat.past{background:var(--off);color:#64748b;cursor:not-allowed}
+  .seat.blocked{background:#334155;color:#94a3b8;cursor:not-allowed;flex-direction:column;line-height:1.1}
+  .seat.blocked small{font-size:10px}
+  .seat.selected{outline:3px solid var(--brand);outline-offset:2px}
+  .legend{display:flex;gap:14px;margin-top:12px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:5px}
+  .dot{width:12px;height:12px;border-radius:4px;display:inline-block}
+
+  /* แผงจอง */
+  .panel-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .panel-title b{font-size:16px}
+  .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  .slot{border:1.5px solid #dbe2ef;background:#fff;border-radius:9px;padding:9px 0;
+    font-size:12.5px;text-align:center;cursor:pointer}
+  .slot.busy{background:#fee2e2;border-color:#fecaca;color:#b91c1c;cursor:not-allowed;text-decoration:line-through}
+  .slot.past{background:#f1f5f9;border-color:#e2e8f0;color:#94a3b8;cursor:not-allowed}
+  .slot.sel{background:var(--brand);border-color:var(--brand);color:#fff}
+  .hint{font-size:12px;color:var(--muted);margin:8px 0 0}
+  .range-info{font-size:14px;font-weight:600;margin-top:10px;color:var(--brand)}
+
+  input[type=text]{width:100%;border:1.5px solid #dbe2ef;border-radius:10px;padding:11px 12px;
+    font-size:15px;margin-top:8px;font-family:inherit}
+  input[type=text]:focus{outline:none;border-color:var(--brand)}
+  .btn{width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700;
+    background:var(--brand);color:#fff;margin-top:12px;cursor:pointer;font-family:inherit}
+  .btn:disabled{background:#b7c3dd;cursor:not-allowed}
+  .btn.ghost{background:#eef2f9;color:var(--brand)}
+
+  .booking-line{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;
+    border-bottom:1px solid #f0f2f7}
+  .booking-line:last-child{border-bottom:none}
+  .booking-line .who{color:var(--muted)}
+
+  /* ผลการจอง */
+  .success{background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:var(--radius);
+    padding:16px;text-align:center}
+  .success .big{font-size:18px;font-weight:800;color:#047857;margin-bottom:6px}
+  .success .code{font-size:26px;letter-spacing:4px;font-weight:800;background:#fff;
+    border-radius:10px;padding:8px;margin:10px 0}
+  .error{background:#fef2f2;border:1.5px solid #fecaca;color:#b91c1c;border-radius:10px;
+    padding:10px 12px;font-size:13.5px;margin-top:10px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1b2430;
+    color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:99;opacity:0;
+    transition:opacity .25s;pointer-events:none;white-space:nowrap}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <h1>💻 จองคอมพิวเตอร์ห้อง Lab</h1>
+  <div class="sub">เปิดจองเฉพาะวันศุกร์ 13:00–17:00 น. · ขั้นต่ำ 30 นาที</div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>📅 เลือกวันศุกร์</h2>
+    <div class="dates" id="dates"></div>
+  </div>
+
+  <div class="card">
+    <h2>🪑 ผังที่นั่ง (มองจากหน้าห้อง)</h2>
+    <div class="screen">หน้าห้อง / จอโปรเจกเตอร์</div>
+    <div class="map" id="map"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--free)"></i>ว่างทั้งวัน</span>
+      <span><i class="dot" style="background:var(--part)"></i>ว่างบางช่วง</span>
+      <span><i class="dot" style="background:var(--full)"></i>เต็ม</span>
+      <span><i class="dot" style="background:#334155"></i>ปิดซ่อม</span>
+    </div>
+  </div>
+
+  <div class="card" id="panel" style="display:none">
+    <div class="panel-title">
+      <b id="panelSeat"></b>
+      <button class="btn ghost" style="width:auto;margin:0;padding:7px 14px;font-size:13px" onclick="closePanel()">ปิด</button>
+    </div>
+    <div id="panelBookings"></div>
+    <h2 style="margin-top:12px">⏰ เลือกช่วงเวลา (แตะช่วงแรกและช่วงสุดท้ายที่ต้องการ)</h2>
+    <div class="slots" id="slots"></div>
+    <div class="range-info" id="rangeInfo"></div>
+    <input type="text" id="name" placeholder="ชื่อ-สกุล หรือ รหัสนักศึกษา" maxlength="60">
+    <button class="btn" id="bookBtn" disabled onclick="submitBooking()">ยืนยันการจอง</button>
+    <div id="err"></div>
+  </div>
+
+  <div id="result"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+const THAI_DAYS = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัส','ศุกร์','เสาร์'];
+const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+let CFG = null;
+let selectedDate = null;
+let bookings = [];            // ของวันที่เลือก
+let blockedSeats = [];        // เครื่องที่ปิดให้บริการ [{seat, reason}]
+let selectedSeat = null;
+let selStart = null, selEnd = null; // ช่วง slot ที่เลือก [selStart, selEnd)
+
+function thaiDate(str){
+  const [y,m,d] = str.split('-').map(Number);
+  return `${d} ${THAI_MONTHS[m-1]} ${y+543}`;
+}
+
+async function init(){
+  if (!window.API_BASE){
+    document.querySelector('main').innerHTML = `
+      <div class="card">
+        <b>⚠️ ยังไม่ได้ตั้งค่า API</b>
+        <p style="font-size:14px;color:var(--muted)">เปิดไฟล์ <code>config.js</code> แล้ววาง URL ของ
+        Google Apps Script Web App (ลงท้าย <code>/exec</code>) จากนั้นรีเฟรชหน้านี้
+        — ดูขั้นตอนใน DEPLOY.md</p>
+      </div>`;
+    return;
+  }
+  CFG = await (await fetch(window.API_BASE + '?action=config')).json();
+  renderDates();
+  selectedDate = CFG.fridays[0];
+  await loadDay();
+  // เปิดจาก QR: ?seat=12
+  const qs = new URLSearchParams(location.search);
+  const s = parseInt(qs.get('seat'));
+  if (s >= 1 && s <= CFG.totalSeats) openPanel(s);
+}
+
+function renderDates(){
+  const el = document.getElementById('dates');
+  el.innerHTML = '';
+  CFG.fridays.forEach(f => {
+    const b = document.createElement('button');
+    b.className = 'date-btn' + (f === selectedDate ? ' active' : '');
+    b.innerHTML = `ศุกร์<small>${thaiDate(f)}</small>`;
+    b.onclick = async () => { selectedDate = f; renderDates(); await loadDay(); if (selectedSeat) openPanel(selectedSeat); };
+    el.appendChild(b);
+  });
+}
+
+async function loadDay(){
+  const r = await (await fetch(window.API_BASE + '?action=bookings&date=' + encodeURIComponent(selectedDate))).json();
+  bookings = r.bookings || [];
+  blockedSeats = r.blocked || [];
+  renderDates();
+  renderMap();
+}
+
+function blockedInfo(seat){
+  return blockedSeats.find(b => b.seat === seat);
+}
+
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function seatBusySlots(seat){
+  const busy = new Array(CFG.totalSlots).fill(null);
+  bookings.filter(b => b.seat === seat).forEach(b => {
+    for (let i = b.startSlot; i < b.endSlot; i++) busy[i] = b;
+  });
+  return busy;
+}
+
+function renderMap(){
+  const map = document.getElementById('map');
+  map.innerHTML = '';
+  const rows = CFG.totalSeats / CFG.seatsPerRow;
+  for (let r = 0; r < rows; r++){
+    const row = document.createElement('div');
+    row.className = 'row';
+    for (let c = 0; c < CFG.seatsPerRow; c++){
+      if (c === CFG.aisleAfter) row.appendChild(document.createElement('i')); // ทางเดิน
+      const seat = r * CFG.seatsPerRow + c + 1;
+      const btn = document.createElement('button');
+      const blk = blockedInfo(seat);
+      if (blk){
+        btn.className = 'seat blocked';
+        btn.innerHTML = `${seat}<small>🔧</small>`;
+        btn.onclick = () => showToast(`เครื่อง ${seat} ปิดให้บริการ${blk.reason ? ' · ' + blk.reason : ''}`);
+      } else {
+        const busy = seatBusySlots(seat).filter(Boolean).length;
+        btn.className = 'seat ' + (busy === 0 ? 'free' : busy >= CFG.totalSlots ? 'full' : 'part');
+        if (seat === selectedSeat) btn.classList.add('selected');
+        btn.textContent = seat;
+        btn.onclick = () => openPanel(seat);
+      }
+      row.appendChild(btn);
+    }
+    map.appendChild(row);
+  }
+}
+
+function openPanel(seat){
+  const blk = blockedInfo(seat);
+  if (blk){
+    showToast(`เครื่อง ${seat} ปิดให้บริการ${blk.reason ? ' · ' + blk.reason : ''}`);
+    return;
+  }
+  selectedSeat = seat;
+  selStart = selEnd = null;
+  document.getElementById('result').innerHTML = '';
+  document.getElementById('err').innerHTML = '';
+  document.getElementById('panel').style.display = '';
+  document.getElementById('panelSeat').textContent = `เครื่อง ${seat} · ศุกร์ ${thaiDate(selectedDate)}`;
+  renderMap();
+  renderPanelBookings();
+  renderSlots();
+  updateRangeInfo();
+  document.getElementById('panel').scrollIntoView({behavior:'smooth', block:'start'});
+}
+function closePanel(){
+  selectedSeat = null;
+  document.getElementById('panel').style.display = 'none';
+  renderMap();
+}
+
+function renderPanelBookings(){
+  const el = document.getElementById('panelBookings');
+  const mine = bookings.filter(b => b.seat === selectedSeat)
+    .sort((a,b) => a.startSlot - b.startSlot);
+  if (!mine.length){ el.innerHTML = ''; return; }
+  el.innerHTML = '<h2>รายการจองของเครื่องนี้</h2>' + mine.map(b =>
+    `<div class="booking-line"><span>${CFG.slotLabels[b.startSlot]}–${CFG.slotLabels[b.endSlot]}</span><span class="who">${b.name}</span></div>`
+  ).join('');
+}
+
+function slotIsPast(i){
+  const today = new Date();
+  const [y,m,d] = selectedDate.split('-').map(Number);
+  if (today.getFullYear() !== y || today.getMonth()+1 !== m || today.getDate() !== d) return false;
+  const nowMins = today.getHours()*60 + today.getMinutes();
+  const [hh,mm] = CFG.slotLabels[i].split(':').map(Number);
+  return hh*60 + mm + CFG.slotMinutes <= nowMins;
+}
+
+function renderSlots(){
+  const el = document.getElementById('slots');
+  el.innerHTML = '';
+  const busy = seatBusySlots(selectedSeat);
+  for (let i = 0; i < CFG.totalSlots; i++){
+    const b = document.createElement('button');
+    b.className = 'slot';
+    b.textContent = `${CFG.slotLabels[i]}–${CFG.slotLabels[i+1]}`;
+    if (busy[i]) b.classList.add('busy');
+    else if (slotIsPast(i)) b.classList.add('past');
+    else {
+      if (selStart !== null && i >= selStart && i < selEnd) b.classList.add('sel');
+      b.onclick = () => tapSlot(i, busy);
+    }
+    el.appendChild(b);
+  }
+}
+
+// แตะครั้งแรก = เริ่มช่วง, แตะช่องหลัง = ขยายช่วง (ถ้าไม่ชนช่องที่ถูกจอง), แตะช่องเดิม = ยกเลิก
+function tapSlot(i, busy){
+  if (selStart === null || i < selStart){
+    selStart = i; selEnd = i + 1;
+  } else if (i === selStart && selEnd === selStart + 1){
+    selStart = selEnd = null;
+  } else {
+    // ขยายถึง i หากทุกช่องระหว่างทางว่าง
+    let ok = true;
+    for (let k = selStart; k <= i; k++) if (busy[k] || slotIsPast(k)) { ok = false; break; }
+    if (ok) selEnd = i + 1;
+    else { selStart = i; selEnd = i + 1; }
+  }
+  renderSlots();
+  updateRangeInfo();
+}
+
+function updateRangeInfo(){
+  const el = document.getElementById('rangeInfo');
+  const btn = document.getElementById('bookBtn');
+  if (selStart === null){
+    el.textContent = '';
+    btn.disabled = true;
+    return;
+  }
+  const mins = (selEnd - selStart) * CFG.slotMinutes;
+  const hrs = Math.floor(mins/60), mm = mins%60;
+  const dur = (hrs ? hrs + ' ชม. ' : '') + (mm ? mm + ' นาที' : '');
+  el.textContent = `เลือก ${CFG.slotLabels[selStart]}–${CFG.slotLabels[selEnd]} (รวม ${dur.trim()})`;
+  btn.disabled = false;
+}
+
+async function submitBooking(){
+  const name = document.getElementById('name').value.trim();
+  const errEl = document.getElementById('err');
+  errEl.innerHTML = '';
+  if (!name){ errEl.innerHTML = '<div class="error">กรุณากรอกชื่อผู้จอง</div>'; return; }
+
+  const btn = document.getElementById('bookBtn');
+  btn.disabled = true;
+  try {
+    // หมายเหตุ: ห้ามใส่ header Content-Type เป็น application/json
+    // เพราะ Apps Script ไม่รองรับ CORS preflight — ส่งเป็น text/plain แทน
+    const r = await fetch(window.API_BASE, {
+      method:'POST',
+      body: JSON.stringify({ action:'book', date: selectedDate, seat: selectedSeat, startSlot: selStart, endSlot: selEnd, name })
+    });
+    const data = await r.json();
+    if (!r.ok || data.error){ errEl.innerHTML = `<div class="error">${data.error || 'เกิดข้อผิดพลาด'}</div>`; btn.disabled = false; return; }
+    const bk = data.booking;
+    document.getElementById('result').innerHTML = `
+      <div class="success">
+        <div class="big">✅ จองสำเร็จ!</div>
+        <div>เครื่อง ${bk.seat} · ศุกร์ ${thaiDate(bk.date)}<br>เวลา ${bk.start}–${bk.end} น.<br>ผู้จอง: ${bk.name}</div>
+        <div class="code">${bk.code}</div>
+        <div style="font-size:12px;color:#047857">เก็บรหัสนี้ไว้สำหรับยกเลิกการจอง</div>
+      </div>`;
+    closePanel();
+    await loadDay();
+    document.getElementById('result').scrollIntoView({behavior:'smooth'});
+  } catch {
+    errEl.innerHTML = '<div class="error">เชื่อมต่อไม่ได้ กรุณาลองใหม่</div>';
+    btn.disabled = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
