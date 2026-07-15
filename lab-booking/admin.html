@@ -123,6 +123,31 @@ const adminApi = {
 
 // ---- ส่วนกลางของหน้า admin (เหมือนกันทั้งสองเวอร์ชัน) ----
 const THAI_MONTHS = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+
+// config เป็นค่าคงที่ของห้อง — คำนวณในเครื่อง ไม่ต้องเรียก server
+function localConfig(){
+  const SLOT_START_HOUR = 13, TOTAL_SLOTS = 8, SLOT_MINUTES = 30, FRIDAYS_AHEAD = 4;
+  const slotLabels = [];
+  for (let i = 0; i <= TOTAL_SLOTS; i++){
+    const m = SLOT_START_HOUR * 60 + i * SLOT_MINUTES;
+    slotLabels.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
+  }
+  const fridays = [];
+  const d = new Date(); d.setHours(0,0,0,0);
+  while (fridays.length < FRIDAYS_AHEAD){
+    if (d.getDay() === 5){
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      if (!isToday || now.getHours() < 17){
+        fridays.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      }
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return { totalSeats:56, seatsPerRow:7, aisleAfter:3, totalSlots:TOTAL_SLOTS,
+           slotMinutes:SLOT_MINUTES, slotLabels, fridays };
+}
+
 let PIN = sessionStorage.getItem('labAdminPin') || '';
 let CFG = null, selectedDate = null, bookings = [], blockedSeats = [];
 
@@ -144,7 +169,7 @@ async function login(){
   const errEl = document.getElementById('loginErr');
   errEl.innerHTML = '';
   if (!pin){ errEl.innerHTML = '<div class="error">กรุณากรอกรหัส PIN</div>'; return; }
-  if (!CFG) CFG = await adminApi.config();
+  if (!CFG) CFG = localConfig();
   selectedDate = selectedDate || CFG.fridays[0];
   const r = await adminApi.list(pin, selectedDate);
   if (r.error){ errEl.innerHTML = `<div class="error">${r.error}</div>`; return; }

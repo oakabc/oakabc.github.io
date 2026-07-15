@@ -68,10 +68,13 @@
   .btn:disabled{background:#b7c3dd;cursor:not-allowed}
   .btn.ghost{background:#eef2f9;color:var(--brand)}
 
-  .booking-line{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;
-    border-bottom:1px solid #f0f2f7}
+  .booking-line{display:flex;justify-content:space-between;align-items:center;gap:8px;
+    font-size:13px;padding:7px 0;border-bottom:1px solid #f0f2f7}
   .booking-line:last-child{border-bottom:none}
-  .booking-line .who{color:var(--muted)}
+  .booking-line .who{color:var(--muted);flex:1;text-align:right}
+  .cancel-btn{border:1.5px solid #fecaca;background:#fff;color:#b91c1c;border-radius:8px;
+    padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit;flex:0 0 auto}
+  .sync{font-size:11px;color:var(--brand);font-weight:600;margin-left:6px}
 
   /* ผลการจอง */
   .success{background:#ecfdf5;border:1.5px solid #a7f3d0;border-radius:var(--radius);
@@ -100,7 +103,7 @@
   </div>
 
   <div class="card">
-    <h2>🪑 ผังที่นั่ง (มองจากหน้าห้อง)</h2>
+    <h2>🪑 ผังที่นั่ง (มองจากหน้าห้อง)<span id="sync" class="sync" style="display:none">⟳ กำลังอัปเดต…</span></h2>
     <div class="screen">หน้าห้อง / จอโปรเจกเตอร์</div>
     <div class="map" id="map"></div>
     <div class="legend">
@@ -147,6 +150,31 @@ function thaiDate(str){
   return `${d} ${THAI_MONTHS[m-1]} ${y+543}`;
 }
 
+// config เป็นค่าคงที่ของห้อง — คำนวณในเครื่องเลย ไม่ต้องรอ server
+// (ผังแสดงทันที และตัดเวลารอ Apps Script ไปหนึ่งรอบเต็มๆ)
+function localConfig(){
+  const SLOT_START_HOUR = 13, TOTAL_SLOTS = 8, SLOT_MINUTES = 30, FRIDAYS_AHEAD = 4;
+  const slotLabels = [];
+  for (let i = 0; i <= TOTAL_SLOTS; i++){
+    const m = SLOT_START_HOUR * 60 + i * SLOT_MINUTES;
+    slotLabels.push(`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`);
+  }
+  const fridays = [];
+  const d = new Date(); d.setHours(0,0,0,0);
+  while (fridays.length < FRIDAYS_AHEAD){
+    if (d.getDay() === 5){
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      if (!isToday || now.getHours() < 17){
+        fridays.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      }
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return { totalSeats:56, seatsPerRow:7, aisleAfter:3, totalSlots:TOTAL_SLOTS,
+           slotMinutes:SLOT_MINUTES, slotLabels, fridays };
+}
+
 async function init(){
   if (!window.API_BASE){
     document.querySelector('main').innerHTML = `
@@ -158,14 +186,15 @@ async function init(){
       </div>`;
     return;
   }
-  CFG = await (await fetch(window.API_BASE + '?action=config')).json();
-  renderDates();
+  CFG = localConfig();
   selectedDate = CFG.fridays[0];
-  await loadDay();
+  renderDates();
+  renderMap(); // แสดงผังทันที (ยังไม่รู้สถานะจอง) แล้วค่อยเติมสีเมื่อข้อมูลมา
   // เปิดจาก QR: ?seat=12
   const qs = new URLSearchParams(location.search);
   const s = parseInt(qs.get('seat'));
   if (s >= 1 && s <= CFG.totalSeats) openPanel(s);
+  await loadDay();
 }
 
 function renderDates(){
@@ -181,11 +210,31 @@ function renderDates(){
 }
 
 async function loadDay(){
-  const r = await (await fetch(window.API_BASE + '?action=bookings&date=' + encodeURIComponent(selectedDate))).json();
-  bookings = r.bookings || [];
-  blockedSeats = r.blocked || [];
+  const sync = document.getElementById('sync');
+  sync.style.display = '';
+  try {
+    const r = await (await fetch(window.API_BASE + '?action=bookings&date=' + encodeURIComponent(selectedDate))).json();
+    bookings = r.bookings || [];
+    blockedSeats = r.blocked || [];
+  } catch {
+    showToast('โหลดข้อมูลไม่สำเร็จ กรุณารีเฟรชหน้า');
+  }
+  sync.style.display = 'none';
   renderDates();
   renderMap();
+  // ถ้าแผงจองเปิดอยู่ ให้รีเฟรชข้อมูลในแผงด้วย (ไม่ล้างช่วงเวลาที่ผู้ใช้เลือกไว้)
+  if (selectedSeat && document.getElementById('panel').style.display !== 'none'){
+    const seat = selectedSeat;
+    const blk = blockedInfo(seat);
+    if (blk){
+      closePanel();
+      showToast(`เครื่อง ${seat} ปิดให้บริการ${blk.reason ? ' · ' + blk.reason : ''}`);
+    } else {
+      renderPanelBookings();
+      renderSlots();
+      updateRangeInfo();
+    }
+  }
 }
 
 function blockedInfo(seat){
@@ -267,9 +316,31 @@ function renderPanelBookings(){
   const mine = bookings.filter(b => b.seat === selectedSeat)
     .sort((a,b) => a.startSlot - b.startSlot);
   if (!mine.length){ el.innerHTML = ''; return; }
-  el.innerHTML = '<h2>รายการจองของเครื่องนี้</h2>' + mine.map(b =>
-    `<div class="booking-line"><span>${CFG.slotLabels[b.startSlot]}–${CFG.slotLabels[b.endSlot]}</span><span class="who">${b.name}</span></div>`
+  el.innerHTML = '<h2>รายการจองของเครื่องนี้ · ยกเลิกได้ด้วยรหัส 6 หลักที่ได้ตอนจอง</h2>' + mine.map(b =>
+    `<div class="booking-line"><span>${CFG.slotLabels[b.startSlot]}–${CFG.slotLabels[b.endSlot]}</span><span class="who">${b.name}</span><button class="cancel-btn" onclick="cancelMyBooking('${b.id}')">ยกเลิก</button></div>`
   ).join('');
+}
+
+async function cancelMyBooking(id){
+  const code = prompt('ยืนยันการยกเลิก\nกรอกรหัส 6 หลักที่ได้รับตอนจอง:');
+  if (code === null) return;
+  if (!/^\d{6}$/.test(code.trim())){ showToast('รหัสต้องเป็นตัวเลข 6 หลัก'); return; }
+  showToast('กำลังยกเลิก…');
+  try {
+    const r = await fetch(window.API_BASE, {
+      method:'POST',
+      body: JSON.stringify({ action:'cancel', id, code: code.trim() })
+    });
+    const data = await r.json();
+    if (!r.ok || data.error){ showToast('❌ ' + (data.error || 'ยกเลิกไม่สำเร็จ')); return; }
+    showToast('✅ ยกเลิกการจองแล้ว');
+    bookings = bookings.filter(b => b.id !== id); // อัปเดตทันที ไม่รอโหลดใหม่
+    renderMap();
+    if (selectedSeat){ renderPanelBookings(); renderSlots(); updateRangeInfo(); }
+    loadDay(); // ซิงก์ข้อมูลจริงเบื้องหลัง
+  } catch {
+    showToast('เชื่อมต่อไม่ได้ กรุณาลองใหม่');
+  }
 }
 
 function slotIsPast(i){
@@ -349,6 +420,9 @@ async function submitBooking(){
     const data = await r.json();
     if (!r.ok || data.error){ errEl.innerHTML = `<div class="error">${data.error || 'เกิดข้อผิดพลาด'}</div>`; btn.disabled = false; return; }
     const bk = data.booking;
+    // อัปเดตผังทันทีจากข้อมูลที่เพิ่งจอง ไม่ต้องรอโหลดจาก server อีกรอบ
+    bookings.push({ id: bk.id, date: bk.date, seat: bk.seat, startSlot: selStart, endSlot: selEnd,
+                    name: name.length <= 3 ? name[0] + '***' : name.slice(0,3) + '***' });
     document.getElementById('result').innerHTML = `
       <div class="success">
         <div class="big">✅ จองสำเร็จ!</div>
@@ -357,8 +431,8 @@ async function submitBooking(){
         <div style="font-size:12px;color:#047857">เก็บรหัสนี้ไว้สำหรับยกเลิกการจอง</div>
       </div>`;
     closePanel();
-    await loadDay();
     document.getElementById('result').scrollIntoView({behavior:'smooth'});
+    loadDay(); // ซิงก์ข้อมูลจริงเบื้องหลัง
   } catch {
     errEl.innerHTML = '<div class="error">เชื่อมต่อไม่ได้ กรุณาลองใหม่</div>';
     btn.disabled = false;
